@@ -1,31 +1,71 @@
-#!/bin/bash
-set -e  
+pipeline {
+    agent any
 
-echo "🔹 Running Deploy Script"
+    environment {
+        DOCKER_IMAGE = "lalithambigai011004/task2"
+        CONTAINER_NAME = "task2_container"
+        DOCKER_USERNAME = credentials('Lalithambigai')  // Replace with Jenkins Credential ID
+        DOCKER_PASSWORD = credentials('Lali_0121')  // Replace with Jenkins Credential ID
+    }
 
-chmod +x build.sh
+    stages {
+        stage('Checkout') {
+            steps {
+                echo "🔹 Checking out repository..."
+                git branch: 'main', url: 'https://github.com/Lalitha011004/MiniProject-Devops.git'
+            }
+        }
 
-./build.sh
+        stage('Build Docker Image') {
+            steps {
+                script {
+                    echo "🔹 Building Docker Image..."
+                    sh '''
+                        chmod +x build.sh
+                        ./build.sh
+                    '''
+                }
+            }
+        }
 
-if [ "$(docker ps -aq -f name=task2_container)" ]; then
-    echo "🛑 Stopping and removing existing container 'task2_container'..."
-    docker stop task2_container || true
-    docker rm -f task2_container || true
-else
-    echo "✅ No existing container 'task2_container' found."
-fi
+        stage('Push Docker Image') {
+            steps {
+                script {
+                    echo "🔹 Logging into Docker Hub..."
+                    sh '''
+                        echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
+                        docker tag $DOCKER_IMAGE lalithambigai011004/miniproject-devops
+                        docker push lalithambigai011004/miniproject-devops
+                    '''
+                }
+            }
+        }
 
-echo "DOCKER_USERNAME: $DOCKER_USERNAME"
-if [ -z "$DOCKER_PASSWORD" ]; then
-    echo "❌ ERROR: DOCKER_PASSWORD is empty!"
-    exit 1
-fi
+        stage('Deploy Container') {
+            steps {
+                script {
+                    echo "🔹 Stopping and removing existing container..."
+                    sh '''
+                        if [ "$(docker ps -aq -f name=$CONTAINER_NAME)" ]; then
+                            docker stop $CONTAINER_NAME || true
+                            docker rm -f $CONTAINER_NAME || true
+                        fi
+                        echo "✅ No existing container found."
+                        
+                        echo "🔹 Running new container..."
+                        docker run -d -p 8085:80 --name $CONTAINER_NAME $DOCKER_IMAGE
+                    '''
+                }
+            }
+        }
+    }
 
-echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
-
-docker tag lalithambigai011004/miniproject lalithambigai011004/miniproject-devops
-docker push lalithambigai011004/miniproject-devops
-# Run the container with the new image
-docker run -d -p 8085:80 --name task2_container lalithambigai011004/task2
-
-echo "✅ Docker image pushed and container started successfully!"
+    post {
+        success {
+            echo "✅ Deployment completed successfully!"
+        }
+        failure {
+            echo "❌ Deployment failed!"
+        }
+    }
+}
