@@ -1,0 +1,6 @@
+version: '3'
+services:
+  task2:
+    image: lalithambigai011004/task2
+    ports:
+      - "8085:80"
