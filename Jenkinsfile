@@ -1,5 +1,5 @@
 pipeline {
-    agent any {
+    agent any 
 
         states {
             state('Build and Push Docker Image') {
@@ -12,5 +12,4 @@ pipeline {
                 }
             }
         }
-    }
 }
